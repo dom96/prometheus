@@ -40,7 +40,10 @@ proc initMetricBase(
     registry: registry
   )
 
-proc getMultiSamples[T](self: T): seq[Sample] =
+# proc getSelfSamples[T](self: T): seq[Sample]
+proc getMultiSamples*[T](self: T): seq[Sample] =
+  # TODO: Maybe don't export this? It's only needed for tests.
+  # TODO: Rewrite this to be an iterator.
   # TODO: Multi-threading: lock (https://bit.ly/2VHhm5Z)
   for labels, metric in pairs(self.children):
     let seriesLabels = zip(self.base.labelNames, labels)
@@ -53,6 +56,7 @@ proc getMultiSamples[T](self: T): seq[Sample] =
         )
       )
 
+  mixin getSelfSamples
   result.add(self.getSelfSamples())
 
 macro initMetric[T](self: T, labelValues: varargs[string]): T =
@@ -115,15 +119,15 @@ proc initSample(
 type
   Counter* = object
     base: MetricBase
-    children: Table[seq[string], Counter] # Label values -> MetricBase
+    children: Table[seq[string], Counter] # Label values -> Counter
     value: float64
     created: float64
 
-proc getSelfSamples(self: Counter): seq[Sample] =
+proc getSelfSamples*(self: Counter): seq[Sample] =
   # https://bit.ly/2VILoGA
   return @[
     initSample("_total", @[], self.value),
-    initSample("_created", @[], self.value)
+    initSample("_created", @[], self.created)
   ]
 
 proc reset*(self: var Counter) =
