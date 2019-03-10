@@ -157,6 +157,50 @@ proc initCounter*(
   if labelValues.len == 0:
     result.children = initTable[seq[string], Counter]()
 
+type
+  Gauge* = object
+    base: MetricBase
+    children: Table[seq[string], Gauge] # Label values -> Gauge
+    value: float64
+
+proc getSelfSamples*(self: Gauge): seq[Sample] =
+  return @[
+    initSample("", @[], self.value)
+  ]
+
+proc inc*(self: var Gauge, amount=1.0) =
+  ## Increment gauge by the given amount.
+  self.value += amount
+
+proc dec*(self: var Gauge, amount=1.0) =
+  ## Decrement gauge by the given amount.
+  self.value -= amount
+
+proc set*(self: var Gauge, value: float64) =
+  ## Set gauge to the given value.
+  self.value = value
+
+proc setToCurrentTime*(self: var Gauge) =
+  ## Set gauge to the current unixtime.
+  self.value = epochTime()
+
+proc initGauge*(
+  name: string, documentation: string,
+  labelNames: seq[string] = @[],
+  namespace = "",
+  unit = Unit.Unspecified,
+  registry = registry.globalRegistry,
+  labelValues: seq[string] = @[]
+): Gauge =
+  result =
+    Gauge(
+      base: initMetricBase(
+        name, documentation, labelNames, namespace, unit, registry, labelValues
+      ),
+    )
+  if labelValues.len == 0:
+    result.children = initTable[seq[string], Gauge]()
+
 when isMainModule:
   # Let's test this architecture.
   var c = initCounter(
