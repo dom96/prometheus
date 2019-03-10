@@ -5,7 +5,7 @@ import times
 
 import prometheus
 test "simple gauge":
-  var c = initGauge(
+  var c = newGauge(
     "my_inprogress_requests",
     "Description of gauge"
   )
@@ -28,7 +28,7 @@ test "simple gauge":
 
 
 test "labels gauge":
-  var c = initGauge(
+  var c = newGauge(
     "my_inprogress_requests",
     "Descr",
     @["method", "endpoint"]

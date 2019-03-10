@@ -5,7 +5,7 @@ import times
 
 import prometheus
 test "simple counter":
-  var c = initCounter(
+  var c = newCounter(
     "my_requests_total",
     "HTTP Failures"
   )
@@ -18,7 +18,7 @@ test "simple counter":
       check sample.value == 26.0
 
 test "counter with labels":
-  var c = initCounter(
+  var c = newCounter(
     "my_requests_total",
     "HTTP Failures",
     @["method", "endpoint"]
@@ -35,7 +35,7 @@ test "counter with labels":
         check sample.value == 1
 
 test "counter cannot be decremented":
-  var c = initCounter(
+  var c = newCounter(
     "my_requests_total",
     "HTTP Failures"
   )

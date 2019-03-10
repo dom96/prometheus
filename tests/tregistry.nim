@@ -6,7 +6,7 @@ import strutils
 
 import prometheus
 test "simple":
-  var c = initGauge(
+  var c = newGauge(
     "my_inprogress_requests",
     "Description of gauge"
   )

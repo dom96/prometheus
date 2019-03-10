@@ -82,7 +82,7 @@ proc generateLatest*(registry = globalRegistry): string =
 
 
 # -- This duplication isn't the best, but it does solve some problems.
-proc initCounter*(
+proc newCounter*(
   name: string, documentation: string,
   labelNames: seq[string] = @[],
   namespace = "",
@@ -90,7 +90,7 @@ proc initCounter*(
   registry = globalRegistry,
   labelValues: seq[string] = @[]
 ): Counter =
-  result = initCounterOnly(
+  result = newCounterOnly(
     name,
     documentation,
     labelNames,
@@ -102,7 +102,7 @@ proc initCounter*(
   if labelValues.len == 0:
     registry.register(result)
 
-proc initGauge*(
+proc newGauge*(
   name: string, documentation: string,
   labelNames: seq[string] = @[],
   namespace = "",
@@ -110,7 +110,7 @@ proc initGauge*(
   registry = globalRegistry,
   labelValues: seq[string] = @[]
 ): Gauge =
-  result = initGaugeOnly(
+  result = newGaugeOnly(
     name,
     documentation,
     labelNames,

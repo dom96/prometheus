@@ -78,9 +78,9 @@ proc getMultiSamples*[T](self: T): seq[MetricSample] =
 
 macro initMetric[T](self: T, labelValues: varargs[string]): T =
   let t = getTypeInst(self)
-  let initCall = newIdentNode("init" & $t & "Only")
+  let newCall = newIdentNode("new" & $t & "Only")
   result = quote:
-    `initCall`(
+    `newCall`(
       self.base.name,
       self.base.documentation,
       self.base.labelNames,
@@ -150,7 +150,7 @@ proc inc*(self: var Counter, amount=1.0) =
     raise newException(ValueError, "Cannot decrement a counter")
   self.value += amount
 
-proc initCounterOnly*(
+proc newCounterOnly*(
   name: string, documentation: string,
   labelNames: seq[string] = @[],
   namespace = "",
@@ -194,7 +194,7 @@ proc setToCurrentTime*(self: var Gauge) =
   ## Set gauge to the current unixtime.
   self.value = epochTime()
 
-proc initGaugeOnly*(
+proc newGaugeOnly*(
   name: string, documentation: string,
   labelNames: seq[string] = @[],
   namespace = "",
