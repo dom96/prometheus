@@ -32,7 +32,7 @@ method collect*(self: GCCollector): seq[MetricFamilySamples] =
 
   var maxMemoryGauge = initMetricFamilySamples(
     "nim_gc_mem_max",
-    MetricType.Gauge,
+    MetricType.Counter,
     "Maximum number of bytes allocated by the process across its whole run time",
     Unit.Bytes
   )
