@@ -33,3 +33,12 @@ test "counter with labels":
         check sample.value == 25.0
       else:
         check sample.value == 1
+
+test "counter cannot be decremented":
+  var c = initCounter(
+    "my_requests_total",
+    "HTTP Failures"
+  )
+
+  expect ValueError:
+    c.inc(-1)

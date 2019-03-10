@@ -135,6 +135,8 @@ proc reset*(self: var Counter) =
   self.created = epochTime()
 
 proc inc*(self: var Counter, amount=1.0) =
+  if amount < 0:
+    raise newException(ValueError, "Cannot decrement a counter")
   self.value += amount
 
 proc initCounter*(
