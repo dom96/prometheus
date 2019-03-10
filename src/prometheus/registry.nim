@@ -64,12 +64,16 @@ proc generateSample(sample: Sample, output: var string) =
     output.add(escapeLabel(label[1]))
     output.add("\"")
 
+  if labels.len > 0:
+    output.add("}")
+
   output.add(" ")
   # Other languages use a custom float to string implementation, but I think
   # Nim's is compatible with Go's ParseFloat.
   output.add($sample.value)
 
-   # TODO: Timestamp?
+  # TODO: Timestamp?
+  output.add("\n")
 
 proc generateLatest*(registry = globalRegistry): string =
   for metric in registry.collect():
