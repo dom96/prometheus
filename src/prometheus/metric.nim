@@ -1,16 +1,19 @@
 import tables, sets, sequtils, times, strformat, macros
 
-import registry
-
 type
-  Sample* =
+  MetricSample* =
     tuple[suffix: string, seriesLabels: seq[(string, string)], value: float64]
 
-type
+  Sample* =
+    tuple[name: string, seriesLabels: seq[(string, string)], value: float64]
+
   ## https://prometheus.io/docs/practices/naming/
   Unit* = enum
     Unspecified, Seconds, Celsius, Meters, Bytes, Ratio, Volts, Amperes, Joules,
     Grams
+
+  MetricType* {.pure.} = enum
+    Counter, Gauge, Summary, Histogram
 
   MetricBase* = object
     name: string
@@ -19,7 +22,23 @@ type
     labelValues: seq[string]
     namespace: string
     unit: Unit
-    registry: CollectorRegistry
+
+  MetricFamilySamples* = object
+    name*: string
+    kind*: MetricType
+    documentation*: string
+    unit*: Unit
+    samples*: seq[Sample]
+
+proc initSample*(
+  name: string, seriesLabels: seq[(string, string)], value: float64
+): Sample =
+  return (name, seriesLabels, value)
+
+proc initMetricSample(
+  suffix: string, seriesLabels: seq[(string, string)], value: float64
+): MetricSample =
+  return (suffix, seriesLabels, value)
 
 proc initMetricBase(
   name: string,
@@ -27,7 +46,6 @@ proc initMetricBase(
   labelNames: seq[string],
   namespace: string,
   unit: Unit,
-  registry: CollectorRegistry,
   labelValues: seq[string]
 ): MetricBase =
   MetricBase(
@@ -36,12 +54,11 @@ proc initMetricBase(
     labelNames: labelNames,
     labelValues: labelValues,
     namespace: namespace,
-    unit: unit,
-    registry: registry
+    unit: unit
   )
 
 # proc getSelfSamples[T](self: T): seq[Sample]
-proc getMultiSamples*[T](self: T): seq[Sample] =
+proc getMultiSamples*[T](self: T): seq[MetricSample] =
   # TODO: Maybe don't export this? It's only needed for tests.
   # TODO: Rewrite this to be an iterator.
   # TODO: Multi-threading: lock (https://bit.ly/2VHhm5Z)
@@ -61,7 +78,7 @@ proc getMultiSamples*[T](self: T): seq[Sample] =
 
 macro initMetric[T](self: T, labelValues: varargs[string]): T =
   let t = getTypeInst(self)
-  let initCall = newIdentNode("init" & $t)
+  let initCall = newIdentNode("init" & $t & "Only")
   result = quote:
     `initCall`(
       self.base.name,
@@ -69,7 +86,6 @@ macro initMetric[T](self: T, labelValues: varargs[string]): T =
       self.base.labelNames,
       self.base.namespace,
       self.base.unit,
-      self.base.registry,
       @labelValues
     )
 
@@ -111,23 +127,18 @@ proc remove*[T](self: var T, labelValues: varargs[string]) =
   # TODO: Lock
   self.children.del(@labelValues)
 
-proc initSample(
-  suffix: string, seriesLabels: seq[(string, string)], value: float64
-): Sample =
-  return (suffix, seriesLabels, value)
-
 type
-  Counter* = object
+  Counter* = ref object
     base: MetricBase
     children: Table[seq[string], Counter] # Label values -> Counter
     value: float64
     created: float64
 
-proc getSelfSamples*(self: Counter): seq[Sample] =
+proc getSelfSamples*(self: Counter): seq[MetricSample] =
   # https://bit.ly/2VILoGA
   return @[
-    initSample("_total", @[], self.value),
-    initSample("_created", @[], self.created)
+    initMetricSample("_total", @[], self.value),
+    initMetricSample("_created", @[], self.created)
   ]
 
 proc reset*(self: var Counter) =
@@ -139,18 +150,17 @@ proc inc*(self: var Counter, amount=1.0) =
     raise newException(ValueError, "Cannot decrement a counter")
   self.value += amount
 
-proc initCounter*(
+proc initCounterOnly*(
   name: string, documentation: string,
   labelNames: seq[string] = @[],
   namespace = "",
   unit = Unit.Unspecified,
-  registry = registry.globalRegistry,
   labelValues: seq[string] = @[]
 ): Counter =
   result =
     Counter(
       base: initMetricBase(
-        name, documentation, labelNames, namespace, unit, registry, labelValues
+        name, documentation, labelNames, namespace, unit, labelValues
       ),
       created: epochTime(),
     )
@@ -158,14 +168,14 @@ proc initCounter*(
     result.children = initTable[seq[string], Counter]()
 
 type
-  Gauge* = object
+  Gauge* = ref object
     base: MetricBase
     children: Table[seq[string], Gauge] # Label values -> Gauge
     value: float64
 
-proc getSelfSamples*(self: Gauge): seq[Sample] =
+proc getSelfSamples*(self: Gauge): seq[MetricSample] =
   return @[
-    initSample("", @[], self.value)
+    initMetricSample("", @[], self.value)
   ]
 
 proc inc*(self: var Gauge, amount=1.0) =
@@ -184,26 +194,51 @@ proc setToCurrentTime*(self: var Gauge) =
   ## Set gauge to the current unixtime.
   self.value = epochTime()
 
-proc initGauge*(
+proc initGaugeOnly*(
   name: string, documentation: string,
   labelNames: seq[string] = @[],
   namespace = "",
   unit = Unit.Unspecified,
-  registry = registry.globalRegistry,
   labelValues: seq[string] = @[]
 ): Gauge =
   result =
     Gauge(
       base: initMetricBase(
-        name, documentation, labelNames, namespace, unit, registry, labelValues
+        name, documentation, labelNames, namespace, unit, labelValues
       ),
     )
   if labelValues.len == 0:
     result.children = initTable[seq[string], Gauge]()
 
+# TODO: Create a `Metric` concept
+proc collect*[T](self: T): seq[MetricFamilySamples] =
+  var metricFamily = MetricFamilySamples(
+    name: self.base.name,
+    documentation: self.base.documentation,
+    unit: self.base.unit,
+    samples: @[]
+  )
+
+  when T is Counter:
+    metricFamily.kind = MetricType.Counter
+  elif T is Gauge:
+    metricFamily.kind = MetricType.Gauge
+  else:
+    {.error: "Unknown metric type".}
+
+  for sample in self.getMultiSamples():
+    metricFamily.samples.add(
+      initSample(
+        self.base.name & sample.suffix,
+        sample.seriesLabels,
+        sample.value
+      )
+    )
+  return @[metricFamily]
+
 when isMainModule:
   # Let's test this architecture.
-  var c = initCounter(
+  var c = initCounterOnly(
     "my_requests_total",
     "HTTP Failures",
     @["method", "endpoint"]

@@ -42,3 +42,5 @@ test "counter cannot be decremented":
 
   expect ValueError:
     c.inc(-1)
+
+# TODO: Verify label names
