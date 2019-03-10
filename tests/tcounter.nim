@@ -4,43 +4,51 @@ import unittest
 import times
 
 import prometheus
-test "simple counter":
-  var c = newCounter(
-    "my_requests_total",
-    "HTTP Failures"
-  )
 
-  c.inc()
-  c.inc(25.0)
-  let samples = getMultiSamples(c)
-  for sample in samples:
-    if sample.suffix == "_total":
-      check sample.value == 26.0
+suite "tcounter":
+  setup:
+    let testRegistry = newCollectorRegistry()
 
-test "counter with labels":
-  var c = newCounter(
-    "my_requests_total",
-    "HTTP Failures",
-    @["method", "endpoint"]
-  )
+  test "simple counter":
+    var c = newCounter(
+      "my_requests_total",
+      "HTTP Failures",
+      registry=testRegistry
+    )
 
-  c.labels("get", "/").inc(25)
-  c.inc()
-  let samples = getMultiSamples(c)
-  for sample in samples:
-    if sample.suffix == "_total":
-      if sample.seriesLabels == {"method": "get", "endpoint": "/"}:
-        check sample.value == 25.0
-      else:
-        check sample.value == 1
+    c.inc()
+    c.inc(25.0)
+    let samples = getMultiSamples(c)
+    for sample in samples:
+      if sample.suffix == "_total":
+        check sample.value == 26.0
 
-test "counter cannot be decremented":
-  var c = newCounter(
-    "my_requests_total",
-    "HTTP Failures"
-  )
+  test "counter with labels":
+    var c = newCounter(
+      "my_requests_total",
+      "HTTP Failures",
+      @["method", "endpoint"],
+      registry=testRegistry
+    )
 
-  expect ValueError:
-    c.inc(-1)
+    c.labels("get", "/").inc(25)
+    c.inc()
+    let samples = getMultiSamples(c)
+    for sample in samples:
+      if sample.suffix == "_total":
+        if sample.seriesLabels == {"method": "get", "endpoint": "/"}:
+          check sample.value == 25.0
+        else:
+          check sample.value == 1
+
+  test "counter cannot be decremented":
+    var c = newCounter(
+      "my_requests_total",
+      "HTTP Failures",
+      registry=testRegistry
+    )
+
+    expect ValueError:
+      c.inc(-1)
 
 # TODO: Verify label names
