@@ -210,6 +210,41 @@ proc newGaugeOnly*(
   if labelValues.len == 0:
     result.children = initTable[seq[string], Gauge]()
 
+proc initMetricFamilySamples*(
+  name: string,
+  kind: MetricType,
+  documentation: string,
+  unit: Unit
+): MetricFamilySamples =
+  MetricFamilySamples(
+    name: name,
+    kind: kind,
+    documentation: documentation,
+    unit: unit
+  )
+
+proc addMetric*(
+  self: var MetricFamilySamples,
+  value: float64,
+  labels: openarray[(string, string)]=[]
+) =
+  let name =
+    case self.kind
+    of MetricType.Counter:
+      self.name & "_total"
+    of MetricType.Gauge:
+      self.name
+    else:
+      self.name
+  self.samples.add(initSample(name, @labels, value))
+
+proc addMetric*(
+  self: var MetricFamilySamples,
+  value: int,
+  labels: openarray[(string, string)]=[]
+) =
+  self.addMetric(value.float64, labels)
+
 # TODO: Create a `Metric` concept
 proc collect*[T](self: T): seq[MetricFamilySamples] =
   var metricFamily = MetricFamilySamples(

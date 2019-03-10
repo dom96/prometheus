@@ -60,3 +60,13 @@ suite "tregistry":
         "My first description",
         registry=testRegistry
       )
+
+suite "Collector: GCCollector":
+  test "primary":
+    # We also test that the GC Collector has been added implicitly here.
+    let exposition = generateLatest()
+
+    when defined(nimTypeNames):
+      check r"nim_gc_mem_object_usage{type=""string""}" in exposition
+    check r"nim_gc_mem_total" in exposition
+    check r"nim_gc_mem_free" in exposition
