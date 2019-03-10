@@ -1,4 +1,4 @@
-import strutils, strformat, algorithm
+import strutils, strformat, algorithm, sets
 
 import collector, metric
 
@@ -7,26 +7,47 @@ type
     collectors: seq[Collector]
     counters: seq[Counter]
     gauges: seq[Gauge]
+    registeredNames: HashSet[string]
 
 proc newCollectorRegistry*(): CollectorRegistry =
   CollectorRegistry(
-    collectors: @[]
+    collectors: @[],
+    registeredNames: initSet[string]()
   )
 
 # TODO: Use shared memory + getGlobalRegistry proc (and/or template for locking)
 var
   globalRegistry* = newCollectorRegistry()
 
+proc getNames(collector: Collector): HashSet[string] =
+  result = initSet[string]()
+  for metric in collector.collect():
+    result.incl(metric.name)
+
+proc addNames(self: CollectorRegistry, names: HashSet[string] | string) =
+  let duplicates =
+    when names is string: toSet([names]) * self.registeredNames
+    else: names * self.registeredNames
+  if duplicates.len > 0:
+    raise newException(
+      ValueError, fmt"Duplicated timeseries in registry: {duplicates}"
+    )
+  self.registeredNames.incl(names)
+
 proc register*(self: CollectorRegistry, collector: Collector) =
   ## Add a collector to the registry.
+  let names = getNames(collector)
+  self.addNames(names)
   self.collectors.add(collector)
 
 proc register*(self: CollectorRegistry, counter: Counter) =
   ## Add a counter to the registry.
+  self.addNames(counter.name)
   self.counters.add(counter)
 
 proc register*(self: CollectorRegistry, gauge: Gauge) =
   ## Add a gauge to the registry.
+  self.addNames(gauge.name)
   self.gauges.add(gauge)
 
 iterator collect*(self: CollectorRegistry): MetricFamilySamples =

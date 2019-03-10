@@ -236,9 +236,12 @@ proc collect*[T](self: T): seq[MetricFamilySamples] =
     )
   return @[metricFamily]
 
+proc name*(self: Counter or Gauge): string =
+  return self.base.name
+
 when isMainModule:
   # Let's test this architecture.
-  var c = initCounterOnly(
+  var c = newCounterOnly(
     "my_requests_total",
     "HTTP Failures",
     @["method", "endpoint"]

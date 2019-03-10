@@ -46,3 +46,17 @@ suite "tregistry":
       my_inprogress_requests 123.0
     """.unindent()
     check exposition == expected
+
+  test "duplicate labels":
+    discard newGauge(
+      "test",
+      "My first description",
+      registry=testRegistry
+    )
+
+    expect ValueError:
+      discard newGauge(
+        "test",
+        "My first description",
+        registry=testRegistry
+      )
