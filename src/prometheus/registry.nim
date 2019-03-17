@@ -70,6 +70,10 @@ iterator collect*(self: CollectorRegistry): MetricFamilySamples =
     for sample in metric.collect():
       yield sample
 
+  for metric in self.histograms:
+    for sample in metric.collect():
+      yield sample
+
 proc escapeDoc(doc: string): string =
   doc.multireplace({"\\": r"\\", "\n": r"\n"})
 

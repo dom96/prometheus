@@ -1,4 +1,4 @@
-import tables, sets, sequtils, times, strformat, macros, algorithm
+import tables, sets, sequtils, times, strformat, macros, algorithm, strutils
 
 type
   MetricSample* =
@@ -33,6 +33,25 @@ proc initMetricSample(
 ): MetricSample =
   return (suffix, seriesLabels, value)
 
+proc verifyMetricName(name: string) =
+  if name[0] notin {'a'..'z', 'A'..'Z', ':'}:
+    raise newException(
+      ValueError, fmt"Invalid metric name, must not begin with '{name[0]}'"
+    )
+
+  for c in name:
+    if c notin {'a'..'z', 'A'..'Z', '0'..'9', '_', ':'}:
+      raise newException(
+        ValueError, fmt"Invalid metric name, must not contain '{c}'"
+      )
+
+proc createFullName(name: string, unit: Unit): string =
+  result = name
+  let unitSuffix = toLower("_" & $unit)
+  if unit != Unspecified and not result.endsWith(unitSuffix):
+    result.add(unitSuffix)
+  verifyMetricName(name)
+
 proc initMetricBase(
   name: string,
   documentation: string,
@@ -42,7 +61,7 @@ proc initMetricBase(
   labelValues: seq[string]
 ): MetricBase =
   MetricBase(
-    name: name,
+    name: name.createFullName(unit),
     documentation: documentation,
     labelNames: labelNames,
     labelValues: labelValues,
@@ -125,18 +144,15 @@ type
     base: MetricBase
     children: Table[seq[string], Counter] # Label values -> Counter
     value: float64
-    created: float64
 
 proc getSelfSamples*(self: Counter): seq[MetricSample] =
   # https://bit.ly/2VILoGA
   return @[
-    initMetricSample("_total", @[], self.value),
-    initMetricSample("_created", @[], self.created)
+    initMetricSample("_total", @[], self.value)
   ]
 
 proc reset*(self: var Counter) =
   self.value = float64(0)
-  self.created = epochTime()
 
 proc inc*(self: var Counter, amount=1.0) =
   if amount < 0:
@@ -150,12 +166,14 @@ proc newCounterOnly*(
   unit = Unit.Unspecified,
   labelValues: seq[string] = @[]
 ): Counter =
+  var name = name
+  if name.endsWith("_total"):
+    name = name[0 .. ^6]
   result =
     Counter(
       base: initMetricBase(
         name, documentation, labelNames, namespace, unit, labelValues
       ),
-      created: epochTime(),
     )
   if labelValues.len == 0:
     result.children = initTable[seq[string], Counter]()
@@ -297,8 +315,12 @@ proc initMetricFamilySamples*(
   documentation: string,
   unit: Unit
 ): MetricFamilySamples =
-  MetricFamilySamples(
-    name: name,
+  var name = name
+  if kind == MetricType.Counter and name.endsWith("_total"):
+    name = name[0 .. ^6]
+
+  result = MetricFamilySamples(
+    name: name.createFullName(unit),
     kind: kind,
     documentation: documentation,
     unit: unit

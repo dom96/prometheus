@@ -3,6 +3,7 @@
 import unittest
 import times
 import os
+import strutils
 
 import prometheus
 
@@ -118,3 +119,6 @@ suite "thistogram":
       if sample.suffix == "_count":
         check sample.value == count.float
     check hadValue
+
+    let latest = testRegistry.generateLatest()
+    check r"code_latency_seconds_bucket{le=""inf""} 3.0" in latest
