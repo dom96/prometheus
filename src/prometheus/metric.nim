@@ -1,4 +1,4 @@
-import tables, sets, sequtils, times, strformat, macros
+import tables, sets, sequtils, times, strformat, macros, algorithm
 
 type
   MetricSample* =
@@ -22,13 +22,6 @@ type
     labelValues: seq[string]
     namespace: string
     unit: Unit
-
-  MetricFamilySamples* = object
-    name*: string
-    kind*: MetricType
-    documentation*: string
-    unit*: Unit
-    samples*: seq[Sample]
 
 proc initSample*(
   name: string, seriesLabels: seq[(string, string)], value: float64
@@ -210,6 +203,86 @@ proc newGaugeOnly*(
   if labelValues.len == 0:
     result.children = initTable[seq[string], Gauge]()
 
+type
+  Histogram* = ref object
+    base: MetricBase
+    children: Table[seq[string], Histogram] # Label values -> Histogram
+    sum: float64
+    upperBounds: seq[float64]
+    buckets: seq[float64]
+
+proc observe*(self: var Histogram, amount: float64) =
+  ## Increment gauge by the given amount.
+  self.sum += amount
+  for i, bound in pairs(self.upperBounds):
+    if amount <= bound:
+      self.buckets[i] += 1
+      break
+
+proc getSelfSamples*(self: Histogram): seq[MetricSample] =
+  var acc = 0.0
+  for i, bound in pairs(self.upperBounds):
+    acc += self.buckets[i]
+    result.add(
+      initMetricSample("_bucket", @{"le": $bound}, acc)
+    )
+
+  result.add(initMetricSample("_count", @[], acc))
+  result.add(initMetricSample("_sum", @[], self.sum))
+
+const
+  defaultHistogramBuckets* = @[
+    0.005, 0.01, 0.025, 0.05, 0.075,
+    0.1, 0.25, 0.5, 0.75, 1.0, 2.5,
+    5.0, 7.5, 10.0, INF
+  ]
+
+proc newHistogramOnly*(
+  name: string, documentation: string,
+  labelNames: seq[string] = @[],
+  namespace = "",
+  unit = Unit.Unspecified,
+  labelValues: seq[string] = @[],
+  buckets = defaultHistogramBuckets
+): Histogram =
+  result =
+    Histogram(
+      base: initMetricBase(
+        name, documentation, labelNames, namespace, unit, labelValues
+      ),
+    )
+  if "le" in labelNames:
+    raise newException(
+      ValueError, "Cannot use `le` label name here. Reserved by histogram."
+    )
+  if labelValues.len == 0:
+    result.children = initTable[seq[string], Histogram]()
+
+  # Prepare upper bounds using buckets.
+  var buckets = buckets
+  if not buckets.isSorted(system.cmp):
+    raise newException(ValueError, "Buckets not in sorted order.")
+
+  if buckets.len < 2:
+    raise newException(ValueError, "Must have at least two buckets")
+
+  if buckets[^1] != INF:
+    buckets.add(INF)
+
+  result.upperBounds = buckets
+
+  # Initialize buckets.
+  for b in result.upperBounds:
+    result.buckets.add(0)
+
+type
+  MetricFamilySamples* = object
+    name*: string
+    kind*: MetricType
+    documentation*: string
+    unit*: Unit
+    samples*: seq[Sample]
+
 proc initMetricFamilySamples*(
   name: string,
   kind: MetricType,
@@ -258,6 +331,8 @@ proc collect*[T](self: T): seq[MetricFamilySamples] =
     metricFamily.kind = MetricType.Counter
   elif T is Gauge:
     metricFamily.kind = MetricType.Gauge
+  elif T is Histogram:
+    metricFamily.kind = MetricType.Histogram
   else:
     {.error: "Unknown metric type".}
 
@@ -271,7 +346,7 @@ proc collect*[T](self: T): seq[MetricFamilySamples] =
     )
   return @[metricFamily]
 
-proc name*(self: Counter or Gauge): string =
+proc name*(self: Counter or Gauge or Histogram): string =
   return self.base.name
 
 when isMainModule:

@@ -7,6 +7,7 @@ type
     collectors: seq[Collector]
     counters: seq[Counter]
     gauges: seq[Gauge]
+    histograms: seq[Histogram]
     registeredNames: HashSet[string]
 
 proc newCollectorRegistry*(): CollectorRegistry =
@@ -49,6 +50,11 @@ proc register*(self: CollectorRegistry, gauge: Gauge) =
   ## Add a gauge to the registry.
   self.addNames(gauge.name)
   self.gauges.add(gauge)
+
+proc register*(self: CollectorRegistry, histogram: Histogram) =
+  ## Add a histogram to the registry.
+  self.addNames(histogram.name)
+  self.histograms.add(histogram)
 
 iterator collect*(self: CollectorRegistry): MetricFamilySamples =
   # TODO LOCK
@@ -136,6 +142,27 @@ proc newGauge*(
   labelValues: seq[string] = @[]
 ): Gauge =
   result = newGaugeOnly(
+    name,
+    documentation,
+    labelNames,
+    namespace,
+    unit,
+    labelValues
+  )
+
+  if labelValues.len == 0:
+    registry.register(result)
+
+proc newHistogram*(
+  name: string, documentation: string,
+  labelNames: seq[string] = @[],
+  namespace = "",
+  unit = Unit.Unspecified,
+  registry = globalRegistry,
+  labelValues: seq[string] = @[],
+  buckets = defaultHistogramBuckets
+): Histogram =
+  result = newHistogramOnly(
     name,
     documentation,
     labelNames,
