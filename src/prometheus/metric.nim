@@ -275,6 +275,14 @@ proc newHistogramOnly*(
   for b in result.upperBounds:
     result.buckets.add(0)
 
+template time*(self: Histogram, body: untyped): untyped =
+  ## Can be used to time a piece of code, observed timings will be logged to
+  ## the specified histogram.
+  bind epochTime
+  let start = epochTime()
+  body
+  self.observe(epochTime() - start)
+
 type
   MetricFamilySamples* = object
     name*: string
