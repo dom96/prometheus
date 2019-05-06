@@ -159,6 +159,9 @@ proc inc*(self: var Counter, amount=1.0) =
     raise newException(ValueError, "Cannot decrement a counter")
   self.value += amount
 
+proc inc*(self: var Counter, amount: int) =
+  self.inc(amount.float64)
+
 proc newCounterOnly*(
   name: string, documentation: string,
   labelNames: seq[string] = @[],
@@ -197,9 +200,9 @@ proc dec*(self: var Gauge, amount=1.0) =
   ## Decrement gauge by the given amount.
   self.value -= amount
 
-proc set*(self: var Gauge, value: float64) =
+proc set*(self: var Gauge, value: float64 | int) =
   ## Set gauge to the given value.
-  self.value = value
+  self.value = value.float64
 
 proc setToCurrentTime*(self: var Gauge) =
   ## Set gauge to the current unixtime.
