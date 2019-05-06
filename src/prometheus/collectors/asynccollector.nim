@@ -54,14 +54,18 @@ when isFutureLoggingEnabled:
             "procName": $entry.procname,
             "line": $entry.line,
             "filename": $entry.filename
-          }
+          },
+          merge=true
         )
       else:
         pendingFuturesGauge.addMetric(
           count,
           labels={
             "procName": info.fromProc,
-          }
+            "line": "unknown",
+            "filename": "unknown"
+          },
+          merge=true
         )
     pendingFuturesGauge.addMetric(totalPendingFutures)
 

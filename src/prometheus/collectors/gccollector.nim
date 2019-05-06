@@ -87,8 +87,16 @@ method collect*(self: GCCollector): seq[MetricFamilySamples] =
       inc totalAllocated, it.sizes
 
     for i in 0 .. n-1:
-      typeHeapUsageGauge.addMetric(a[i][2], labels={"type": $a[i][0]})
-      typeAllocCountGauge.addMetric(a[i][1], labels={"type": $a[i][0]})
+      typeHeapUsageGauge.addMetric(
+        a[i][2],
+        labels={"type": $a[i][0]},
+        merge=true
+      )
+      typeAllocCountGauge.addMetric(
+        a[i][1],
+        labels={"type": $a[i][0]},
+        merge=true
+      )
     typeHeapUsageGauge.addMetric(totalAllocated)
     let (allocs, deallocs) = getMemCounters()
     allocCountGauge.addMetric(allocs)

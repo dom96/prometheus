@@ -332,8 +332,10 @@ proc initMetricFamilySamples*(
 proc addMetric*(
   self: var MetricFamilySamples,
   value: float64,
-  labels: openarray[(string, string)]=[]
+  labels: openarray[(string, string)]=[],
+  merge=false
 ) =
+  ## The `merge` param determines whether to merge the same sample name/labels.
   let name =
     case self.kind
     of MetricType.Counter:
@@ -342,14 +344,32 @@ proc addMetric*(
       self.name
     else:
       self.name
-  self.samples.add(initSample(name, @labels, value))
+
+  let newSample = initSample(name, @labels, value)
+  # Make sure a sample with the same name and labels doesn't already exist.
+  for sample in mitems(self.samples):
+    if sample.name == newSample.name and
+        sample.seriesLabels == newSample.seriesLabels:
+      if merge:
+        sample.value += value
+        return
+      else:
+        raise newException(
+          ValueError,
+          "A sample with the same name and labels already exists." &
+          fmt" Old sample: {sample}. New sample: {sample}."
+        )
+
+  # If it doesn't exist already, simply add it.
+  self.samples.add(newSample)
 
 proc addMetric*(
   self: var MetricFamilySamples,
   value: int,
-  labels: openarray[(string, string)]=[]
+  labels: openarray[(string, string)]=[],
+  merge=false
 ) =
-  self.addMetric(value.float64, labels)
+  self.addMetric(value.float64, labels, merge)
 
 # TODO: Create a `Metric` concept
 proc collect*[T](self: T): seq[MetricFamilySamples] =
