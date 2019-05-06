@@ -40,7 +40,8 @@ method collect*(self: GCCollector): seq[MetricFamilySamples] =
   freeMemoryGauge.addMetric(getFreeMem())
   totalMemoryGauge.addMetric(getTotalMem())
   occupiedMemoryGauge.addMetric(getOccupiedMem())
-  maxMemoryGauge.addMetric(getMaxMem())
+  when declared(getMaxMem):
+    maxMemoryGauge.addMetric(getMaxMem())
 
   result = @[
     freeMemoryGauge, totalMemoryGauge, occupiedMemoryGauge, maxMemoryGauge
