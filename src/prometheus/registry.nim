@@ -172,7 +172,8 @@ proc newHistogram*(
     labelNames,
     namespace,
     unit,
-    labelValues
+    labelValues,
+    buckets
   )
 
   if labelValues.len == 0:

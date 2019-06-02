@@ -91,15 +91,31 @@ proc getMultiSamples*[T](self: T): seq[MetricSample] =
 macro initMetric[T](self: T, labelValues: varargs[string]): T =
   let t = getTypeInst(self)
   let newCall = newIdentNode("new" & $t & "Only")
-  result = quote:
-    `newCall`(
-      self.base.name,
-      self.base.documentation,
-      self.base.labelNames,
-      self.base.namespace,
-      self.base.unit,
-      @labelValues
-    )
+  if $t == "Histogram":
+    result = quote:
+      `newCall`(
+        self.base.name,
+        self.base.documentation,
+        self.base.labelNames,
+        self.base.namespace,
+        self.base.unit,
+        @labelValues,
+        self.upperBounds
+      )
+  elif $t == "Counter" or $t == "Gauge":
+    result = quote:
+      `newCall`(
+        self.base.name,
+        self.base.documentation,
+        self.base.labelNames,
+        self.base.namespace,
+        self.base.unit,
+        @labelValues
+      )
+  else:
+    let text = newStrLitNode($t)
+    result = quote:
+      {.error: "Unknown type: " & `text`.}
 
 proc labels*[T](self: var T, labelValues: varargs[string]): var T =
   if self.base.labelNames.len == 0:
