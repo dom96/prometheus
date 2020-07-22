@@ -224,6 +224,15 @@ proc setToCurrentTime*(self: var Gauge) =
   ## Set gauge to the current unixtime.
   self.value = epochTime()
 
+proc reset*(self: var Gauge) =
+  ## Resets the specified gauge's value to 0.
+  self.value = float64(0)
+
+proc clear*(self: var Gauge) =
+  ## Clears all the labels in this Gauge and resets the current one to 0.
+  self.value = float64(0)
+  self.children.clear()
+
 proc newGaugeOnly*(
   name: string, documentation: string,
   labelNames: seq[string] = @[],
