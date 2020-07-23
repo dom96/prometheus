@@ -18,6 +18,15 @@ Add this into your .nimble file:
 requires "prometheus"
 ```
 
+You then need to serve the Prometheus metrics over HTTP, if you're using Jester you can do so by simply:
+
+```nim
+routes:
+  get "/metrics":
+    let data = generateLatest()
+    resp Http200, {"Content-type": "text/plain"}, data
+```
+
 ## Testing
 
 Run:
